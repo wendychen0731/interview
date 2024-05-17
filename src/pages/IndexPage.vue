@@ -1,140 +1,205 @@
 <template>
-  <q-page class="row q-pt-xl">
-    <div class="full-width q-px-xl">
-      <div class="q-mb-xl">
-        <q-input v-model="tempData.name" label="姓名" />
-        <q-input v-model="tempData.age" label="年齡" />
-        <q-btn color="primary" class="q-mt-md">新增</q-btn>
-      </div>
+  <q-page class="flex flex-center">
+    <q-card style="width: 600px;">
+      <q-card-section>
+        <div class="text-h6">CRUD 操作</div>
+      </q-card-section>
 
-      <q-table
-        flat
-        bordered
-        ref="tableRef"
-        :rows="blockData"
-        :columns="(tableConfig as QTableProps['columns'])"
-        row-key="id"
-        hide-pagination
-        separator="cell"
-        :rows-per-page-options="[0]"
-      >
-        <template v-slot:header="props">
-          <q-tr :props="props">
-            <q-th v-for="col in props.cols" :key="col.name" :props="props">
-              {{ col.label }}
-            </q-th>
-            <q-th></q-th>
-          </q-tr>
-        </template>
+      <q-card-section>
+        <q-form @submit.prevent="isEditing ? updateItem() : createItem()">
+          <q-input v-model="formData.name" label="姓名" :rules="[val => !!val || '姓名不得空白']" />
+          <q-input v-model="formData.age" label="年齡" type="number" :rules="[val => !!val || '年齡不得空白', val => val > 0 || '年齡必須為正整數']" />
+          <q-btn type="submit" :label="isEditing ? '更新' : '新增'" color="primary" class="q-mt-md" />
+        </q-form>
+      </q-card-section>
 
-        <template v-slot:body="props">
-          <q-tr :props="props">
-            <q-td
-              v-for="col in props.cols"
-              :key="col.name"
-              :props="props"
-              style="min-width: 120px"
-            >
-              <div>{{ col.value }}</div>
-            </q-td>
-            <q-td class="text-right" auto-width v-if="tableButtons.length > 0">
-              <q-btn
-                @click="handleClickOption(btn, props.row)"
-                v-for="(btn, index) in tableButtons"
-                :key="index"
-                size="sm"
-                color="grey-6"
-                round
-                dense
-                :icon="btn.icon"
-                class="q-ml-md"
-                padding="5px 5px"
-              >
-                <q-tooltip
-                  transition-show="scale"
-                  transition-hide="scale"
-                  anchor="top middle"
-                  self="bottom middle"
-                  :offset="[10, 10]"
-                >
-                  {{ btn.label }}
-                </q-tooltip>
-              </q-btn>
-            </q-td>
-          </q-tr>
-        </template>
-        <template v-slot:no-data="{ icon }">
-          <div
-            class="full-width row flex-center items-center text-primary q-gutter-sm"
-            style="font-size: 18px"
-          >
-            <q-icon size="2em" :name="icon" />
-            <span> 無相關資料 </span>
-          </div>
+      <q-separator />
+
+      <q-table :rows="items" :columns="columns" row-key="id" class="q-mt-md">
+        <template v-slot:body-cell-action="props">
+          <q-td align="center">
+            <q-btn flat round icon="edit" @click="editItem(props.row)" />
+            <q-btn flat round icon="delete" color="negative" @click="confirmDelete(props.row.id)" />
+          </q-td>
         </template>
       </q-table>
-    </div>
+    </q-card>
   </q-page>
 </template>
 
-<script setup lang="ts">
+<script>
+import { ref, onMounted } from 'vue';
 import axios from 'axios';
-import { QTableProps } from 'quasar';
-import { ref } from 'vue';
-interface btnType {
-  label: string;
-  icon: string;
-  status: string;
-}
-const blockData = ref([
-  {
-    name: 'test',
-    age: 25,
-  },
-]);
-const tableConfig = ref([
-  {
-    label: '姓名',
-    name: 'name',
-    field: 'name',
-    align: 'left',
-  },
-  {
-    label: '年齡',
-    name: 'age',
-    field: 'age',
-    align: 'left',
-  },
-]);
-const tableButtons = ref([
-  {
-    label: '編輯',
-    icon: 'edit',
-    status: 'edit',
-  },
-  {
-    label: '刪除',
-    icon: 'delete',
-    status: 'delete',
-  },
-]);
+import { Dialog } from 'quasar';
 
-const tempData = ref({
-  name: '',
-  age: '',
-});
-function handleClickOption(btn, data) {
-  // ...
-}
+export default {
+  name: 'IndexPage',
+  setup() {
+    const items = ref([]);
+    const formData = ref({
+      id: null,
+      name: '',
+      age: null,
+    });
+    const isEditing = ref(false);
+
+    const fetchItems = async () => {
+      try {
+        console.log('Fetching items...');
+        const response = await axios.get('https://dahua.metcfire.com.tw/api/CRUDTest/a');
+        items.value = response.data;
+        console.log('Fetched items:', items.value);
+      } catch (error) {
+        console.error('Error fetching items:', error);
+      }
+    };
+
+    const createItem = () => {
+      console.log('Create item called');
+      console.log('Form data:', formData.value);
+
+      if (!formData.value.name || !formData.value.age) {
+        alert('請填寫所有欄位');
+        return;
+      }
+
+      try {
+        const payload = {
+          name: formData.value.name,
+          age: formData.value.age,
+        };
+
+        console.log('Payload to be sent:', payload);
+
+        const response = axios.post('https://dahua.metcfire.com.tw/api/CRUDTest', payload, {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+        console.log('Response:', response);
+
+        if (response.data && response.data.id) {
+          items.value.push(response.data);
+          resetForm(); 
+          console.log('Item created:', response.data);
+        } else {
+          console.error('Invalid response data:', response.data);
+        }
+      } catch (error) {
+        console.error('Error creating item:', error.response ? error.response.data : error);
+      }
+    };
+
+    const editItem = (item) => {
+      console.log('Edit item called:', item);
+      formData.value = { ...item };
+      isEditing.value = true;
+    };
+
+    const updateItem = () => {
+      console.log('Update item called');
+      if (!formData.value.id) {
+        alert('請選擇一個項目來更新');
+        return;
+      }
+
+      try {
+        const payload = {
+          id: formData.value.id,
+          name: formData.value.name,
+          age: formData.value.age,
+        };
+
+        console.log('Payload to be sent:', payload);
+
+        const response = axios.patch(`https://dahua.metcfire.com.tw/api/CRUDTest/${formData.value.id}`, payload, {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+        console.log('Response:', response);
+
+        if (response.data && response.data.id) {
+          const index = items.value.findIndex(item => item.id === formData.value.id);
+          if (index !== -1) {
+            items.value[index] = response.data;
+          }
+          resetForm(); 
+          console.log('Item updated:', response.data);
+        } else {
+          console.error('Invalid response data:', response.data);
+        }
+      } catch (error) {
+        console.error('Error updating item:', error.response ? error.response.data : error);
+      }
+    };
+
+    const confirmDelete = (id) => {
+      console.log('Confirm delete called for id:', id);
+      Dialog.create({
+        title: '確認刪除',
+        message: '確定要刪除這個項目嗎？',
+        cancel: true,
+        persistent: true,
+      }).onOk(() => deleteItem(id));
+    };
+
+    const deleteItem = (id) => {
+      console.log('Delete item called for id:', id);
+      try {
+        const response = axios.delete(`https://dahua.metcfire.com.tw/api/CRUDTest/${id}`);
+        console.log('Response:', response);
+
+        if (response.status === 200) {
+          items.value = items.value.filter(item => item.id !== id);
+          console.log('Item deleted with id:', id);
+        } else {
+          console.error('Error deleting item:', response.data);
+        }
+      } catch (error) {
+        console.error('Error deleting item:', error.response ? error.response.data : error);
+      }
+    };
+
+    const resetForm = () => {
+      formData.value = {
+        id: null,
+        name: '',
+        age: null,
+      };
+      isEditing.value = false;
+      console.log('Form reset');
+    };
+
+    onMounted(fetchItems);
+
+    const columns = [
+      { name: 'name', required: true, label: '姓名', align: 'left', field: 'name' },
+      { name: 'age', align: 'left', label: '年齡', field: 'age' },
+      { name: 'action', align: 'center', label: '操作', field: 'action' },
+    ];
+
+    return {
+      items,
+      formData,
+      isEditing,
+      createItem,
+      editItem,
+      updateItem,
+      deleteItem,
+      confirmDelete,
+      columns,
+    };
+  }
+};
 </script>
 
-<style lang="scss" scoped>
-.q-table th {
-  font-size: 20px;
-  font-weight: bold;
+<style scoped>
+.q-page {
+  max-width: 800px;
+  margin: auto;
 }
-
-.q-table tbody td {
-  font-size: 18px;
+.q-mt-md {
+  margin-top: 16px;
 }
 </style>
