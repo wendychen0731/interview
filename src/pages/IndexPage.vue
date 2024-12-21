@@ -5,25 +5,28 @@
       <h6 class="mode-title" v-if="!isEditing">新增資料</h6>
       <h6 class="mode-title" v-else>編輯資料</h6>
       <div class="q-mb-xl">
-        <q-input 
-          v-model="tempData.name" 
-          label="姓名" 
-          required
-          :rules="[
-            val => (val && val.trim().length > 0) || '姓名不得空白'
-          ]"
-          clearable
-        />
-        <q-input 
-          v-model="tempData.age" 
-          label="年齡"
-          type="number" 
-          required 
-          :rules="[
-            val => (val && /^[1-9][0-9]*$/.test(String(val))) || '年齡不得空白且需為正整數'
-          ]"
-          clearable
-        />
+        <div :class="{ 'edit-mode': isEditing }" style="padding: 20px;">
+          <q-input 
+            v-model="tempData.name" 
+            label="姓名" 
+            required
+            :rules="[
+              val => (val && val.trim().length > 0) || '姓名不得空白'
+            ]"
+            clearable
+          />
+          <q-input 
+            v-model="tempData.age" 
+            label="年齡"
+            type="number" 
+            required 
+            :rules="[
+              val => (val && /^[1-9][0-9]*$/.test(String(val))) || '年齡不得空白且需為正整數'
+            ]"
+            clearable
+          />
+        </div>
+
         <q-btn
           :color="isEditing ? 'secondary' : 'primary'"
           class="q-mt-md"
@@ -54,7 +57,6 @@
       >
         <template v-slot:header="props">
           <q-tr :props="props">
-            <!-- 遍歷每個欄位，渲染表頭 -->
             <q-th v-for="col in props.cols" :key="col.name" :props="props">
               {{ col.label }}
             </q-th>
@@ -62,7 +64,7 @@
           </q-tr>
         </template>
 
-        <!-- 表格主體插槽 -->
+        <!-- 表格主體 -->
         <template v-slot:body="props">
           <q-tr :props="props">
             <q-td
@@ -101,7 +103,6 @@
           </q-tr>
         </template>
 
-        <!-- 無資料時的顯示 -->
         <template v-slot:no-data="{ icon }">
           <div
             class="full-width row flex-center items-center text-primary q-gutter-sm"
@@ -149,7 +150,7 @@ interface BtnType {
   status: 'edit' | 'delete';
 }
 
-// 定義按鈕操作的聯合類型
+// 定義按鈕操作的類型
 type ButtonAction = BtnType | { status: 'add' };
 
 // 定義資料類型
@@ -230,7 +231,6 @@ async function handleClickOption(btn: ButtonAction, data: DataItem | TempData) {
   } else {
     switch (btn.status) {
       case 'edit':
-        // 編輯資料：將資料載入到輸入欄位，切換到編輯模式
         if (!('id' in data)) {
           $q.notify({
             type: 'negative',
@@ -240,19 +240,17 @@ async function handleClickOption(btn: ButtonAction, data: DataItem | TempData) {
           return;
         }
 
-        // 將當前資料複製到 tempData
+        // 將資料複製到 tempData
         tempData.value = {
           name: (data as DataItem).name,
           age: (data as DataItem).age,
         };
-        // 設定當前編輯的 ID
         currentEditId.value = (data as DataItem).id;
-        // 進入編輯模式
         isEditing.value = true;
         break;
 
       case 'delete':
-        // 刪除資料：打開刪除確認對話框
+        // 打開刪除確認對話框
         if (!('id' in data)) {
           $q.notify({
             type: 'negative',
@@ -264,7 +262,7 @@ async function handleClickOption(btn: ButtonAction, data: DataItem | TempData) {
 
         // 設定要刪除的項目
         itemToDelete.value = data as DataItem;
-        // 打開刪除確認對話框
+        // 打開確認彈窗
         deleteDialog.value = true;
         break;
 
@@ -276,7 +274,7 @@ async function handleClickOption(btn: ButtonAction, data: DataItem | TempData) {
 
 // 新增資料
 async function handleAdd() {
-  // 驗證資料
+  // 資料驗證
   if (
     typeof tempData.value.name !== 'string' ||
     (typeof tempData.value.age !== 'string' && typeof tempData.value.age !== 'number')
@@ -356,33 +354,13 @@ async function handleUpdate() {
       age: Number(age),
     });
 
-    console.log('PATCH Response:', response.data); // 查看 PATCH 回應
-
-    // 確認 PATCH 回應是否包含更新後的資料
-    if (response.data && response.data.id) {
+    if (response.data) {
       // 更新畫面資料
-      const index = blockData.value.findIndex((item) => item.id === currentEditId.value);
-      if (index !== -1) {
-        console.log(`Updating blockData at index ${index} with`, response.data);
-        blockData.value[index] = { ...response.data };
-      } else {
-        // 如果找不到對應的項目，重新載入資料
-        await reloadData();
-      }
-    } else {
-      // 如果回應不包含更新後的資料，手動更新本地資料
-      const index = blockData.value.findIndex((item) => item.id === currentEditId.value);
-      if (index !== -1) {
-        console.log(`Manually updating blockData at index ${index}`);
-        blockData.value[index].name = name.trim();
-        blockData.value[index].age = Number(age);
-      }
-    }
-
-    // 清空編輯狀態
+      await reloadData();
+    } 
+    // 清空編輯狀態與input欄位
     isEditing.value = false;
     currentEditId.value = null;
-    // 清空欄位
     tempData.value.name = '';
     tempData.value.age = '';
 
@@ -494,5 +472,10 @@ async function reloadData() {
   font-size: 24px;
   color: red;
   font-weight: 800;
+}
+
+.edit-mode{
+  border: 2px solid green;
+  border-radius: 5px;
 }
 </style>
